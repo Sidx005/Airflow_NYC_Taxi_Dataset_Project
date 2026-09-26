@@ -1,0 +1,37 @@
+# Git / Astro
+.git
+.astro/
+astro_settings.yaml
+airflow_settings.yaml
+.astro/*.local.yml
+.astro/*.local.yaml
+.astro/standalone/
+.astro/worktrees/
+
+# Environment / secrets
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Data
+*.parquet
+processed_yellow_tripdata_2026-01/
+
+# Spark
+.spark/
+spark-warehouse/
+
+# Airflow local files
+airflow-webserver.pid
+airflow.cfg
+airflow.db
+webserver_config.py
+logs/
+
+# OS
+.DS_Store

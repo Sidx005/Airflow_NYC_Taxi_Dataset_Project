@@ -1,0 +1,6 @@
+pandas
+pyarrow
+boto3
+apache-airflow-providers-amazon
+pyspark
+psycopg2-binary
