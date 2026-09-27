@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import(col,count,sum,when)
 
-INPUT_PATH="processed_yellow_tripdata_2026-01"
+INPUT_PATH="/usr/local/airflow/processed_yellow_tripdata_2026-01"
 
 spark=(
     SparkSession.builder

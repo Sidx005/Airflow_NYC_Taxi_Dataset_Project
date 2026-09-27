@@ -1,9 +1,9 @@
 import boto3
 from botocore.exceptions import ClientError
 
-FILE_PATH="yellow_tripdata_2026-01.parquet"
+FILE_PATH = "/usr/local/airflow/yellow_tripdata_2026-01.parquet"
 
-MINIO_ENDPOINT="http://localhost:9000"
+MINIO_ENDPOINT="http://host.docker.internal:9000"
 MINIO_ACCESS_KEY="admin"
 MINIO_SECRET_KEY="minioadmin"
 

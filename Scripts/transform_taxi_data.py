@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (col,round,unix_timestamp,when)
 
-FILE_PATH="yellow_tripdata_2026-01.parquet"
+FILE_PATH = "/usr/local/airflow/yellow_tripdata_2026-01.parquet"
 OUTPUT_PATH = "processed/yellow_tripdata_2026-01.parquet"
 
 MINIO_ENDPOINT = "http://localhost:9000"
@@ -113,7 +113,7 @@ df.select(
 ).show(10, truncate=False)
 
 #  Write transformed data locally
-OUTPUT_LOCAL_PATH="processed_yellow_tripdata_2026-01"
+OUTPUT_LOCAL_PATH = "/usr/local/airflow/processed_yellow_tripdata_2026-01"
 
 df.write.mode("overwrite").parquet(OUTPUT_LOCAL_PATH)
 

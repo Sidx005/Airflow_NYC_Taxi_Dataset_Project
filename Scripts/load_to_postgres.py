@@ -1,8 +1,8 @@
 from pyspark.sql import SparkSession
 
-INPUT_PATH="processed_yellow_tripdata_2026-01"
+INPUT_PATH="/usr/local/airflow/processed_yellow_tripdata_2026-01"
+POSTGRES_URL="jdbc:postgresql://host.docker.internal:5432/nyc_taxi"
 
-POSTGRES_URL="jdbc:postgresql://localhost:5432/nyc_taxi"
 
 POSTGRES_PROPERTIES={
     "user" : "nyc_user",
@@ -13,7 +13,7 @@ POSTGRES_PROPERTIES={
 spark=(
     SparkSession.builder
     .appName("NYCTaxiPostgresLoad")
-    .config("spark.jars", "jars/postgresql-42.7.8.jar")
+    .config("spark.jars", "/usr/local/airflow/jars/postgresql-42.7.8.jar")
     .getOrCreate()
 )
 
