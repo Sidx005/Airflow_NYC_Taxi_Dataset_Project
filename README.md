@@ -594,7 +594,6 @@ with DAG(
 nyc-taxi-data-pipeline/
 │
 ├── dags/
-│   ├── nyc_taxi_ingestion.py
 │   └── nyc_taxi_pipeline.py
 │
 ├── Scripts/
