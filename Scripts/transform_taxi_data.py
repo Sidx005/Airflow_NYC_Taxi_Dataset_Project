@@ -2,10 +2,10 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import (col,round,unix_timestamp,when)
 
 FILE_PATH = "/usr/local/airflow/yellow_tripdata_2026-01.parquet"
-OUTPUT_PATH = "processed/yellow_tripdata_2026-01.parquet"
+# OUTPUT_PATH = "processed/yellow_tripdata_2026-01.parquet"
 
-MINIO_ENDPOINT = "http://localhost:9000"
-BUCKET_NAME = "nyc-taxi"
+# MINIO_ENDPOINT = "http://localhost:9000"
+# BUCKET_NAME = "nyc-taxi"
 
 spark=SparkSession.builder.appName("NYCTaxiTransformation").master("local[*]").getOrCreate()
 
