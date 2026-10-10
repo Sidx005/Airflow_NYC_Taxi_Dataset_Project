@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 
 INPUT_PATH="/usr/local/airflow/processed_yellow_tripdata_2026-01"
-POSTGRES_URL="jdbc:postgresql://host.docker.internal:5432/nyc_taxi"
+POSTGRES_URL="jdbc:postgresql://nyc-postgres:5432/nyc_taxi"
 
 
 POSTGRES_PROPERTIES={

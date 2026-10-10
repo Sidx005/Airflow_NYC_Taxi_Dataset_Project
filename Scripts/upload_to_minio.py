@@ -3,7 +3,7 @@ from botocore.exceptions import ClientError
 
 FILE_PATH = "/usr/local/airflow/yellow_tripdata_2026-01.parquet"
 
-MINIO_ENDPOINT="http://host.docker.internal:9000"
+MINIO_ENDPOINT="http://minio:9000"
 MINIO_ACCESS_KEY="admin"
 MINIO_SECRET_KEY="minioadmin"
 

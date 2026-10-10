@@ -3,7 +3,7 @@ import os
 
 LOCAL_PATH = "/usr/local/airflow/processed_yellow_tripdata_2026-01"
 
-MINIO_ENDPOINT = "http://host.docker.internal:9000"
+MINIO_ENDPOINT = "http://minio:9000"
 
 MINIO_ACCESS_KEY="admin"
 MINIO_SECRET_KEY="minioadmin"

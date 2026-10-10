@@ -1,7 +1,7 @@
 import psycopg2
 
 DB_CONFIG={
-       "host": "host.docker.internal",
+       "host": "nyc-postgres",
     "port": 5432,
     "database": "nyc_taxi",
     "user": "nyc_user",
