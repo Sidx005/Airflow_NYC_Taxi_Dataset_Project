@@ -29,6 +29,11 @@ with DAG(
         task_id="upload_processed_data",
         bash_command="python /usr/local/airflow/Scripts/upload_processed_to_minio.py",
     )
+
+    create_postgres_table = BashOperator(
+        task_id="create_postgres_table",
+        bash_command="python /usr/local/airflow/Scripts/create_postgres_table.py",
+    )
     truncate_postgres= BashOperator(
         task_id="truncate_postgres",
         bash_command="python /usr/local/airflow/Scripts/truncate_postgres.py",
@@ -38,4 +43,4 @@ with DAG(
         bash_command="python /usr/local/airflow/Scripts/load_to_postgres.py",
     )
 
-    ingest >> transform >> data_quality >> upload_processed >> truncate_postgres >> load_postgres
+    ingest >> transform >> data_quality >> upload_processed >> create_postgres_table >> truncate_postgres >> load_postgres

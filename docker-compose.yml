@@ -13,6 +13,8 @@ services:
     
     volumes:
       - nyc_postgres_data:/var/lib/postgresql/data
+    networks:
+      - pipeline
  minio:
     image: cgr.dev/chainguard/minio:latest
     container_name: minio
@@ -30,6 +32,8 @@ services:
     
     volumes:
       - minio_data:/data
+    networks:
+      - pipeline
  metabase:
    image: metabase/metabase
    container_name: metabase
@@ -40,7 +44,13 @@ services:
   
    volumes:
      - metabase_data:/metabase.db
+   networks:
+      - pipeline
 volumes:
   nyc_postgres_data:
   minio_data:
   metabase_data:
+networks:
+  pipeline:
+    name: nyc-taxi-pipeline
+    driver: bridge

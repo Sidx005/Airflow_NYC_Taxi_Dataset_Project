@@ -1,0 +1,18 @@
+services:
+ scheduler:
+    networks:
+     - pipeline
+ dag-processor:
+    networks:
+      - pipeline
+    
+ api-server:
+    networks:
+      - pipeline
+ triggerer:
+    networks:
+      - pipeline
+networks:
+  pipeline:
+    name: nyc-taxi-pipeline
+    driver: bridge

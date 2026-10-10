@@ -1,7 +1,7 @@
 import psycopg2
 
 conn = psycopg2.connect(
-    host="localhost",
+    host="nyc-postgres",
     port=5432,
     database="nyc_taxi",
     user="nyc_user",
