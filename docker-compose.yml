@@ -14,7 +14,7 @@ services:
     volumes:
       - nyc_postgres_data:/var/lib/postgresql/data
  minio:
-    image: minio/minio
+    image: cgr.dev/chainguard/minio:latest
     container_name: minio
     restart: unless-stopped
 
