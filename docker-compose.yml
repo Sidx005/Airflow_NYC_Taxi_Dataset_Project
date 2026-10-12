@@ -8,8 +8,10 @@ services:
       POSTGRES_USER: nyc_user
       POSTGRES_PASSWORD: nyc_password
       POSTGRES_DB: nyc_taxi
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5433:5432"
     
     volumes:
       - nyc_postgres_data:/var/lib/postgresql/data
