@@ -14,20 +14,7 @@ A production-style, end-to-end **ETL data pipeline** for the NYC Yellow Taxi dat
 
 ## 📐 Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                       Apache Airflow (Astronomer)               │
-│                                                                 │
-│  [Ingest Raw Data] → [Transform (Spark)] → [Data Quality]      │
-│        → [Upload Processed] → [Create Table] → [Load Postgres] │
-└────────┬────────────────────────────┬────────────────┬─────────┘
-         │                            │                │
-         ▼                            ▼                ▼
-    ┌─────────┐               ┌──────────────┐  ┌──────────────┐
-    │  MinIO  │               │  PostgreSQL  │  │   Metabase   │
-    │ (S3-API)│               │  (nyc_taxi)  │  │  Dashboard   │
-    └─────────┘               └──────────────┘  └──────────────┘
-```
+![Architecture Diagram](nyc_etl_architecture.png)
 
 ---
 
