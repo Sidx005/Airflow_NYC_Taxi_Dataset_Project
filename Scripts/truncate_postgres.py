@@ -1,12 +1,14 @@
+import os
 import psycopg2
 
-DB_CONFIG={
-       "host": "nyc-postgres",
-    "port": 5432,
-    "database": "nyc_taxi",
-    "user": "nyc_user",
-    "password": "nyc_password", 
+DB_CONFIG = {
+    "host":     os.environ.get("POSTGRES_HOST", "nyc-postgres"),
+    "port":     int(os.environ.get("POSTGRES_PORT", 5432)),
+    "database": os.environ.get("POSTGRES_DB", "nyc_taxi"),
+    "user":     os.environ.get("POSTGRES_USER", "nyc_user"),
+    "password": os.environ.get("POSTGRES_PASSWORD", "nyc_password"),
 }
+
 
 def truncate_table():
     print("="*60)
