@@ -380,6 +380,7 @@ openjdk-21-jre-headless
 
 ## 📁 MinIO Bucket Layout
 
+
 ```
 nyc-taxi/
 ├── raw/
