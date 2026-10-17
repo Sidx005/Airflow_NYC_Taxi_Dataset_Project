@@ -16,6 +16,10 @@ A production-style, end-to-end **ETL data pipeline** for the NYC Yellow Taxi dat
 
 ![Architecture Diagram](nyc_etl_architecture.png)
 
+
+
+**Draw.io File:** [Open or download the architecture diagram](NYC%20ETL%20Diagram.drawio)
+
 ---
 
 ## 🔄 Pipeline DAG
