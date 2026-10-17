@@ -1,756 +1,396 @@
-# NYC Taxi Data Pipeline
+# 🚕 NYC Taxi Data Pipeline
 
-A local batch ETL pipeline for processing NYC TLC Yellow Taxi trip data
-using **Apache Airflow, PySpark, MinIO, PostgreSQL, Docker, and
-Metabase**.
+A production-style, end-to-end **ETL data pipeline** for the NYC Yellow Taxi dataset, orchestrated with **Apache Airflow** (via Astronomer Runtime), powered by **Apache Spark** for large-scale transformations, and served through **Metabase** dashboards.
 
-The project demonstrates an end-to-end data engineering workflow:
+---
 
-``` text
-NYC TLC Parquet
-      ↓
-Airflow
-      ↓
-MinIO / Raw
-      ↓
-PySpark Transformation
-      ↓
-Data Quality
-      ↓
-MinIO / Processed
-      ↓
-PostgreSQL
-      ↓
-Metabase Dashboard
+## Dataset
+
+**Link** : https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
+
+**File** : yellow_tripdata_2026-01.parquet (January 2026)
+
+---
+
+## 📐 Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       Apache Airflow (Astronomer)               │
+│                                                                 │
+│  [Ingest Raw Data] → [Transform (Spark)] → [Data Quality]      │
+│        → [Upload Processed] → [Create Table] → [Load Postgres] │
+└────────┬────────────────────────────┬────────────────┬─────────┘
+         │                            │                │
+         ▼                            ▼                ▼
+    ┌─────────┐               ┌──────────────┐  ┌──────────────┐
+    │  MinIO  │               │  PostgreSQL  │  │   Metabase   │
+    │ (S3-API)│               │  (nyc_taxi)  │  │  Dashboard   │
+    └─────────┘               └──────────────┘  └──────────────┘
 ```
 
-The stack runs locally with Docker and Astro/Airflow, without requiring
-paid cloud infrastructure.
+---
 
-------------------------------------------------------------------------
+## 🔄 Pipeline DAG
 
-## 1. Overview
+The Airflow DAG (`nyc_taxi_pipeline`) runs the following tasks in sequence:
 
-![NYC Taxi Dashboard](Dashboard.png)
+| Step | Task ID | Script | Description |
+|------|---------|--------|-------------|
+| 1 | `ingest_raw_data` | `upload_to_minio.py` | Uploads the raw `.parquet` file to MinIO (`nyc-taxi/raw/`) |
+| 2 | `transform_data` | `transform_taxi_data.py` | Cleans & enriches data with PySpark |
+| 3 | `data_quality` | `data_quality.py` | Runs automated data quality checks |
+| 4 | `upload_processed_data` | `upload_processed_to_minio.py` | Uploads transformed data back to MinIO |
+| 5 | `create_postgres_table` | `create_postgres_table.py` | Creates `taxi_trips` table in PostgreSQL (if not exists) |
+| 6 | `truncate_postgres` | `truncate_postgres.py` | Clears stale data before reload |
+| 7 | `load_to_postgres` | `load_to_postgres.py` | Loads processed parquet into PostgreSQL via Spark JDBC |
 
-This project processes the **NYC TLC Yellow Taxi January 2026 dataset**
-through a manually triggered Airflow batch DAG.
+---
 
-The pipeline performs:
+## 🛠️ Tech Stack
 
--   Raw data ingestion
--   Parquet processing with PySpark
--   Data cleaning and transformation
--   Data-quality validation
--   Raw and processed data storage in MinIO
--   Loading cleaned data into PostgreSQL
--   Analytics and visualization using Metabase
+| Component | Technology | Version |
+|-----------|-----------|---------|
+| Orchestration | Apache Airflow (Astronomer Runtime) | `3.3-8` |
+| Distributed Processing | Apache Spark (PySpark) | latest |
+| Object Storage | MinIO (S3-compatible) | latest (Chainguard) |
+| Database | PostgreSQL | `16` |
+| BI / Dashboards | Metabase | latest |
+| Containerization | Docker + Docker Compose | — |
+| JDBC Driver | PostgreSQL JDBC | `42.7.8` |
+| Java Runtime | OpenJDK | `21 JRE headless` |
 
-## 2. Dataset Overview
+---
 
-**Dataset:** NYC TLC Yellow Taxi Trip Data --- January 2026
+## 📦 Project Structure
 
-**Source file:** `yellow_tripdata_2026-01.parquet`
-
-**Format:** Apache Parquet
-
-### Raw dataset
-
--   Rows: **3,724,889**
--   Columns: **20**
-
-Important columns include:
-
-``` text
-VendorID
-tpep_pickup_datetime
-tpep_dropoff_datetime
-passenger_count
-RatecodeID
-store_and_fwd_flag
-PULocationID
-DOLocationID
-payment_type
-fare_amount
-extra
-mta_tax
-tip_amount
-tolls_amount
-improvement_surcharge
-total_amount
-congestion_surcharge
-Airport_fee
-cbd_congestion_fee
 ```
-
-### After transformation
-
--   Final rows: **3,518,153**
--   Invalid records removed: **206,736**
--   Null values in validated fields: **0**
--   Duplicate records: **0**
-
-> The Parquet source file is excluded from Git because of its size.
-> Download the dataset separately and place it at the location expected
-> by the ingestion script.
-
-------------------------------------------------------------------------
-
-## 3. Repository Structure
-
-``` text
 nyc-taxi-data-pipeline/
 ├── dags/
-│   └── nyc_taxi_pipeline.py
+│   └── nyc_taxi_pipeline.py         # Main Airflow DAG
 ├── Scripts/
-│   ├── upload_to_minio.py
-│   ├── transform_taxi_data.py
-│   ├── data_quality.py
-│   ├── upload_processed_to_minio.py
-│   ├── truncate_postgres.py
-│   ├── create_postgres_table.py
-│   ├── load_to_postgres.py
-│   └── inspect_taxi_data.py
-├── Dockerfile
-├── docker-compose.yml
-├── packages.txt
-├── requirements.txt
-├── .gitignore
-├── Dashboard.png
-├── AirflowPipeline.png
-└── README.md
+│   ├── upload_to_minio.py           # Raw data ingestion → MinIO
+│   ├── transform_taxi_data.py       # PySpark transformations
+│   ├── data_quality.py              # PySpark data quality checks
+│   ├── upload_processed_to_minio.py # Processed data → MinIO
+│   ├── create_postgres_table.py     # DDL: taxi_trips table
+│   ├── truncate_postgres.py         # Truncate before reload
+│   ├── load_to_postgres.py          # Spark JDBC → PostgreSQL
+│   └── read_with_spark.py           # Utility: inspect parquet files
+├── jars/
+│   └── postgresql-42.7.8.jar        # JDBC driver for Spark
+├── Dockerfile                       # Astronomer Runtime base image
+├── docker-compose.yml               # PostgreSQL + MinIO + Metabase services
+├── docker-compose.override.yml      # Airflow services joined to pipeline network
+├── airflow_settings.yaml            # Local Airflow connections/variables
+├── .env                             # Environment variables (not committed to Git)
+├── requirements.txt                 # Python dependencies
+└── packages.txt                     # System packages (OpenJDK 21)
 ```
 
-  Component              Purpose
-  ---------------------- -----------------------------------------------
-  `dags/`                Airflow DAG definitions and task dependencies
-  `Scripts/`             ETL, validation, and database scripts
-  `Dockerfile`           Custom Airflow image configuration
-  `docker-compose.yml`   PostgreSQL, MinIO, and Metabase services
-  `packages.txt`         System packages, such as Java
-  `requirements.txt`     Python dependencies
-  Parquet file           Source NYC Taxi dataset; download separately
+---
 
-------------------------------------------------------------------------
+## ⚙️ Transformation Logic
 
-## 4. Setup Commands
+The PySpark transformation step (`transform_taxi_data.py`) performs the following:
+
+1. **Read** raw parquet from the local Airflow mount
+2. **Derive `trip_duration_minutes`** from pickup/dropoff timestamps
+3. **Filter invalid trips** — removes records with zero/negative duration, distance, or fare
+4. **Impute missing values** for passenger count, rate codes, surcharges, and fees
+5. **Compute `average_speed_mph`** = `trip_distance / (duration_in_hours)`
+6. **Round** derived columns to 2 decimal places
+7. **Write** the cleaned dataset to a local parquet output path
+
+---
+
+## ✅ Data Quality Checks
+
+The `data_quality.py` script validates the transformed dataset across 7 dimensions:
+
+| Check | Rule |
+|-------|------|
+| Null Values | All columns checked for NULLs |
+| Duplicates | Total rows vs. distinct rows |
+| Trip Duration | `trip_duration_minutes > 0` |
+| Trip Distance | `trip_distance > 0` |
+| Fare Amount | `fare_amount >= 0` |
+| Total Amount | `total_amount >= 0` |
+| Unrealistic Speed | Warning if `average_speed_mph > 100` |
+
+The pipeline prints a `DATA QUALITY CHECK PASSED` or `FAILED` summary and raises an exception on failure to halt downstream tasks.
+
+---
+
+## 🗄️ PostgreSQL Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS taxi_trips (
+    vendor_id               INTEGER,
+    pickup_datetime         TIMESTAMP,
+    dropoff_datetime        TIMESTAMP,
+    passenger_count         BIGINT,
+    trip_distance           DOUBLE PRECISION,
+    ratecode_id             BIGINT,
+    store_and_fwd_flag      VARCHAR(10),
+    pickup_location_id      INTEGER,
+    dropoff_location_id     INTEGER,
+    payment_type            BIGINT,
+    fare_amount             DOUBLE PRECISION,
+    extra                   DOUBLE PRECISION,
+    mta_tax                 DOUBLE PRECISION,
+    tip_amount              DOUBLE PRECISION,
+    tolls_amount            DOUBLE PRECISION,
+    improvement_surcharge   DOUBLE PRECISION,
+    total_amount            DOUBLE PRECISION,
+    congestion_surcharge    DOUBLE PRECISION,
+    airport_fee             DOUBLE PRECISION,
+    cbd_congestion_fee      DOUBLE PRECISION,
+    trip_duration_minutes   DOUBLE PRECISION,   -- derived
+    average_speed_mph       DOUBLE PRECISION    -- derived
+);
+```
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
-Install Docker Desktop, Astro CLI, and Git. You will also need the
-January 2026 Yellow Taxi Parquet file.
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [Astronomer CLI (`astro`)](https://www.astronomer.io/docs/astro/cli/install-cli)
+- NYC Yellow Taxi parquet file for the target month placed in the project root
 
-### Start the Astro/Airflow environment
+---
 
-From the project directory:
+### Step 1 — Configure the `.env` file
 
-``` bash
+All credentials and file paths are managed through the `.env` file at the project root. This file is read by both `docker-compose.yml` (for the PostgreSQL and MinIO containers) and by the Python scripts at runtime (via `os.environ`).
+
+Fill in the `.env` file before starting any services:
+
+```env
+# ─────────────────────────────────────────────
+# MinIO (S3-compatible Object Storage)
+# ─────────────────────────────────────────────
+MINIO_ENDPOINT=http://minio:9000
+MINIO_ACCESS_KEY=your_minio_user
+MINIO_SECRET_KEY=your_minio_password
+MINIO_BUCKET_NAME=your_minio_bucket
+
+# ─────────────────────────────────────────────
+# PostgreSQL
+# ─────────────────────────────────────────────
+POSTGRES_HOST=your_postgres_host
+POSTGRES_PORT=your_postgres_port
+POSTGRES_DB=your_postgres_db
+POSTGRES_USER=your_postgres_user
+POSTGRES_PASSWORD=your_postgres_password
+
+# ─────────────────────────────────────────────
+# File Paths (inside Airflow container)
+# ─────────────────────────────────────────────
+RAW_FILE_PATH=/usr/local/airflow/yellow_tripdata_2026-01.parquet
+PROCESSED_OUTPUT_PATH=/usr/local/airflow/processed_yellow_tripdata_2026-01
+POSTGRES_JDBC_JAR=/usr/local/airflow/jars/postgresql-42.7.8.jar
+
+# ─────────────────────────────────────────────
+# MinIO Object Keys
+# ─────────────────────────────────────────────
+MINIO_RAW_OBJECT_NAME=raw/yellow_tripdata_2026-01.parquet
+MINIO_PROCESSED_PREFIX=processed/yellow_tripdata_2026-01
+```
+
+> **Note:** `docker-compose.yml` uses `${POSTGRES_USER}`, `${POSTGRES_PASSWORD}`, `${POSTGRES_DB}`, `${MINIO_ACCESS_KEY}`, and `${MINIO_SECRET_KEY}` directly from this file — so the database and object storage containers are configured from the same single source of truth as the Python scripts.
+
+> **Important:** `.env` is listed in `.gitignore` and is **never committed to Git**. Do not hardcode credentials in source files.
+
+---
+
+### Step 2 — Start Supporting Services (MinIO, PostgreSQL, Metabase)
+
+> **Note on two Compose projects:** This project uses **two separate Docker Compose setups** — `docker-compose.yml` (your services: Postgres, MinIO, Metabase) and the Astronomer/Astro CLI Compose (Airflow services). Always use the `-f docker-compose.yml` flag with your project's Compose file to avoid accidentally targeting the Astro Compose project.
+
+```bash
+docker compose -f docker-compose.yml up -d
+```
+
+This starts:
+- **MinIO** → `http://localhost:9001` (UI) / `http://localhost:9000` (API)
+- **PostgreSQL** → `localhost:5433`
+- **Metabase** → `http://localhost:3000`
+
+---
+
+### Step 3 — Start Airflow (Astronomer)
+
+```bash
 astro dev start
 ```
 
-Airflow UI:
+This builds the custom Astronomer Runtime image (with Java 21 and all Python dependencies) and starts the Airflow scheduler, API server, triggerer, and DAG processor — all joined to the `nyc-taxi-pipeline` Docker network.
 
-``` text
-http://localhost:8080
+Airflow UI → `http://localhost:8080`
+
+---
+
+### Step 4 — Set Up MinIO
+
+1. Open `http://localhost:9001` in your browser
+2. Log in with:
+   - **Username:** `your_minio_user` (or the value of `MINIO_ACCESS_KEY` in your `.env`)
+   - **Password:** `your_minio_password` (or the value of `MINIO_SECRET_KEY`)
+3. Go to **Buckets → Create Bucket**
+4. Create a bucket named **`your_minio_bucket`**
+
+> The pipeline will upload raw data to `nyc-taxi/raw/` and processed data to `nyc-taxi/processed/` automatically when the DAG runs.
+
+---
+
+### Step 5 — Set Up Metabase
+
+> **Important — Dashboard is not persistent:** The `Dashboard.png` screenshot in this repo is a sample dashboard created during development. It is **not bundled with the project**. After setting up Metabase on a new machine, you will start with a blank Metabase instance and will need to recreate the questions and dashboard manually after the pipeline has run and data is loaded into PostgreSQL.
+
+**First-time setup:**
+
+1. Open `http://localhost:3000` in your browser
+2. Complete the Metabase onboarding wizard:
+   - Create your admin account (set your own email and password)
+   - When prompted to add your data, select **PostgreSQL** and enter:
+
+| Field | Value |
+|-------|-------|
+| Display Name | `NYC Taxi` |
+| Host | `nyc-postgres` *(use the Docker container name, not `localhost`)* |
+| Port | `5432` |
+| Database name | `nyc_taxi` |
+| Username | `nyc_user` |
+| Password | `nyc_password` |
+| SSL | Off |
+
+3. Complete setup and log in to the Metabase home screen
+
+**After the pipeline runs — Sync the schema:**
+
+After the Airflow DAG completes and data is loaded into PostgreSQL, Metabase will not immediately show the `taxi_trips` table. Metabase syncs its schema on a schedule (default: every hour). To force it to show the table immediately:
+
+1. Go to **Admin Panel** (gear icon → Admin settings)
+2. Click **Databases** in the left sidebar
+3. Click on **NYC Taxi** (your database)
+4. Click **Sync database schema now**
+
+The `taxi_trips` table will then appear when creating new questions or browsing data.
+
+**Recreating the dashboard:**
+
+Once the schema is synced, you can recreate the analytics dashboard. Suggested questions to build:
+
+| Visual | Metabase Question Type | Key Column |
+|--------|----------------------|------------|
+| Total Trips | Count of rows | — |
+| Average Fare | Average of `fare_amount` | — |
+| Average Trip Distance | Average of `trip_distance` | — |
+| Total Revenue | Sum of `total_amount` | — |
+| Daily Trips | Count, grouped by `pickup_datetime` (day) | `pickup_datetime` |
+| Daily Revenue | Sum of `total_amount`, grouped by day | `pickup_datetime` |
+| Payment Type Distribution | Count, grouped by `payment_type` | `payment_type` |
+| Top 10 Pickup Zones | Count, grouped by `pickup_location_id`, limit 10 | `pickup_location_id` |
+
+After creating these as individual questions, combine them into a new dashboard named **NYC Taxi Dashboard**.
+
+---
+
+### Step 6 — Trigger the Pipeline
+
+In the Airflow UI (`http://localhost:8080`), navigate to the `nyc_taxi_pipeline` DAG and click **Trigger DAG ▶**.
+
+Monitor each task in the **Graph** view. Once `load_to_postgres` turns green, the data is in PostgreSQL and ready for Metabase.
+
+---
+
+## 🛑 Stopping the Project
+
+Because there are **two separate Compose projects** running (your services + the Astro/Airflow Compose), use the correct commands for each:
+
+### Stop your project services (Postgres, MinIO, Metabase)
+
+```bash
+# Stop containers but keep volumes (data is preserved)
+docker compose -f docker-compose.yml stop
+
+# Stop AND remove containers (volumes are still preserved)
+docker compose -f docker-compose.yml down
 ```
 
-### Start project services
+### Stop Airflow (Astronomer)
 
-**MinIO warning — read before starting the services on a new laptop:**
-The original `minio/minio` image could not be pulled in the new laptop environment, so this project uses `cgr.dev/chainguard/minio:latest`. Because the Chainguard image runs as a non-root user, an existing MinIO volume may have incompatible permissions. If MinIO restarts with `Unable to write to the backend` or `file access denied`, fix the existing volume ownership before continuing. Do not delete the volume.
-
-For this setup, the volume is `nyc-taxi-data-pipeline_minio_data`. Run the following from the directory containing `docker-compose.yml`:
-
-``` bash
-docker compose stop minio
-
-docker run --rm --user 0:0 \
-  -v nyc-taxi-data-pipeline_minio_data:/data \
-  alpine:3.20 \
-  sh -c 'chown -R 65532:65532 /data && chmod -R u+rwX /data'
+```bash
+astro dev stop
 ```
 
-Then start the project services:
+### ⚠️ Remove everything including data volumes
 
-``` bash
-docker compose up -d
+> [!CAUTION]
+> The `-v` flag deletes all named volumes — this permanently erases your PostgreSQL records, MinIO objects, and Metabase dashboard configuration. Only use this for a full clean reset.
+
+```bash
+# Destroy project services + volumes
+docker compose -f docker-compose.yml down -v
+
+# Destroy Airflow + volumes
+astro dev kill
 ```
 
-If your Compose project or volume name differs, inspect the actual MinIO mount first:
+---
 
-``` bash
-docker inspect minio --format '{{json .Mounts}}'
+## 🔧 Configuration
+
+### Python Dependencies (`requirements.txt`)
+
+```
+pandas
+pyarrow
+boto3
+apache-airflow-providers-amazon
+pyspark
+psycopg2-binary
 ```
 
-Services:
+### System Packages (`packages.txt`)
 
-``` text
-PostgreSQL  → localhost:5432
-MinIO API   → localhost:9000
-MinIO UI    → localhost:9001
-Metabase    → localhost:3000
-Airflow     → localhost:8080
+```
+openjdk-21-jre-headless
 ```
 
-Airflow is started separately through Astro CLI; the other three
-services are defined in the project Compose file.
+> Java 21 is required by PySpark inside the Airflow container.
 
-### Check containers
+---
 
-``` bash
-docker ps
-docker compose ps
+## 🌐 Service Access Summary
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Airflow UI | http://localhost:8080 | `admin` / `admin` |
+| MinIO Console | http://localhost:9001 | value of `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` in `.env` |
+| MinIO S3 API | http://localhost:9000 | — |
+| PostgreSQL | `localhost:5433` | value of `POSTGRES_USER` / `POSTGRES_PASSWORD` in `.env` |
+| Metabase | http://localhost:3000 | set during first-login wizard |
+
+---
+
+## 📁 MinIO Bucket Layout
+
 ```
-
-### Validate the Compose configuration
-
-``` bash
-docker compose config
-```
-
-### Restart project services
-
-``` bash
-docker compose restart nyc-postgres minio metabase
-```
-
-### Stop project services
-
-``` bash
-docker compose stop
-```
-
-> **Important:** Avoid `docker compose down -v` if you want to preserve
-> PostgreSQL records, MinIO objects, and Metabase dashboards. The `-v`
-> option removes Compose-managed named volumes.
-
-------------------------------------------------------------------------
-
-## 5. Pipeline Flow
-
-![Airflow Pipeline](AirflowPipeline.png)
-
-The Airflow DAG executes these tasks in sequence:
-
-``` text
-1. ingest_raw_data
-        ↓
-2. transform_data
-        ↓
-3. data_quality
-        ↓
-4. upload_processed_data
-        ↓
-5. truncate_postgres
-        ↓
-6. load_to_postgres
-```
-
-### 5.1 Ingest
-
-**Script:** `Scripts/upload_to_minio.py`
-
-Uploads the raw Parquet file to the `nyc-taxi` MinIO bucket:
-
-``` text
 nyc-taxi/
-└── raw/
-    └── yellow_tripdata_2026-01.parquet
-```
-
-### 5.2 Transform
-
-**Script:** `Scripts/transform_taxi_data.py`
-
-PySpark reads the raw Parquet data and creates a cleaned dataset with
-derived metrics.
-
-### 5.3 Data quality
-
-**Script:** `Scripts/data_quality.py`
-
-Checks the transformed data for:
-
--   Null values
--   Row count
--   Duplicate records
--   Invalid trip duration
--   Invalid trip distance
--   Negative fares
--   Negative total amounts
--   Abnormally high average speeds
-
-### 5.4 Upload processed data
-
-**Script:** `Scripts/upload_processed_to_minio.py`
-
-Stores the processed Parquet output in MinIO:
-
-``` text
-nyc-taxi/
+├── raw/
+│   └── yellow_tripdata_2026-01.parquet        ← uploaded by ingest step
 └── processed/
-    └── yellow_tripdata_2026-01/
+    └── yellow_tripdata_2026-01/               ← uploaded by upload_processed step
+        └── *.parquet
 ```
 
-### 5.5 PostgreSQL refresh
+---
 
-**Script:** `Scripts/truncate_postgres.py`
+## 📝 License
 
-Clears the existing target table before loading the new batch. This
-makes the current implementation a **full-refresh batch pipeline**, not
-an incremental pipeline.
-
-Because the table is truncated before loading, a subsequent load failure
-may leave the target table empty until the pipeline is rerun
-successfully.
-
-### 5.6 Load
-
-**Script:** `Scripts/load_to_postgres.py`
-
-Loads the processed dataset into:
-
-``` text
-PostgreSQL
-└── Database: nyc_taxi
-    └── Table: taxi_trips
-```
-
-Final loaded records: **3,518,153**
-
-------------------------------------------------------------------------
-
-## 6. Transformations Done
-
-### Trip duration
-
-Trip duration is calculated from the pickup and drop-off timestamps:
-
-``` text
-trip_duration_minutes =
-    (dropoff timestamp - pickup timestamp) / 60
-```
-
-The timestamp difference is converted from seconds to minutes.
-
-### Invalid trip removal
-
-Records are removed when any of these conditions is true:
-
-``` text
-trip_duration_minutes <= 0
-trip_distance <= 0
-fare_amount < 0
-total_amount < 0
-```
-
-This removed **206,736 records** in the documented run.
-
-### Missing-value handling
-
-The following defaults are applied to selected columns:
-
-  Column                     Default
-  ------------------------ ---------
-  `passenger_count`              `1`
-  `RatecodeID`                  `99`
-  `store_and_fwd_flag`           `N`
-  `congestion_surcharge`         `0`
-  `Airport_fee`                  `0`
-  `cbd_congestion_fee`           `0`
-
-These are pipeline-specific fallback values; they do not recover the
-original missing values.
-
-### Average speed
-
-Average speed is calculated in miles per hour:
-
-``` text
-average_speed_mph =
-    trip_distance / (trip_duration_minutes / 60)
-```
-
-### Rounding
-
-The following derived metrics are rounded to **two decimal places**:
-
-``` text
-trip_duration_minutes
-average_speed_mph
-```
-
-------------------------------------------------------------------------
-
-## 7. Data-Quality Results
-
-The documented validation results for the processed dataset are:
-
-  Check                                      Result
-  ---------------------------------- --------------
-  Processed rows                          3,518,153
-  Nulls in validated fields                       0
-  Duplicate rows                                  0
-  Invalid trip durations remaining                0
-  Invalid trip distances remaining                0
-  Negative fares remaining                        0
-  Negative total amounts remaining                0
-  Speeds above 100 mph                 720 warnings
-
-The 720 high-speed records were flagged as warnings. A warning is not
-the same as a record being automatically removed.
-
-------------------------------------------------------------------------
-
-## 8. Dashboard Metrics & Visuals
-
-![NYC Taxi Dashboard](Dashboard.png)
-
-The **NYC Taxi Dashboard** contains eight cards and visualizations.
-
-  -----------------------------------------------------------------------
-  Visual                  Metric / purpose        View
-  ----------------------- ----------------------- -----------------------
-  **Total Trips**         Count of processed taxi Number
-                          trips                   
-
-  **Average Fare**        Average `fare_amount`   Number
-                          per trip                
-
-  **Average Trip          Average `trip_distance` Number
-  Distance**                                      
-
-  **Total Trip Amount**   Sum of `total_amount`   Number
-                          across trips            
-
-  **Daily Trips**         Trip count by pickup    Line chart
-                          date                    
-
-  **Daily Trip Amount**   Sum of `total_amount`   Line chart
-                          by pickup date          
-
-  **Payment Type          Trip count by payment   Pie chart
-  Distribution**          type                    
-
-  **Top 10 Pickup Zones** Pickup locations with   Horizontal bar chart
-                          the highest trip counts 
-  -----------------------------------------------------------------------
-
-### Why these visuals?
-
--   **KPI cards** provide a quick summary of overall trip volume and
-    financial measures.
--   **Daily Trips** helps show how trip demand changes across the month.
--   **Daily Trip Amount** shows the daily trend in recorded trip
-    amounts.
--   **Payment Type Distribution** compares the payment categories.
--   **Top 10 Pickup Zones** identifies pickup zone IDs with the highest
-    trip counts.
-
-Together, the dashboard covers overall volume, financial metrics, time
-trends, payment behaviour, and location demand.
-
-> `PULocationID` represents TLC taxi-zone IDs rather than human-readable
-> location names. A useful future improvement is to join the official
-> TLC Taxi Zone lookup table and display zone names.
-
-### Metric definitions
-
-``` sql
--- Total Trips
-SELECT COUNT(*) AS total_trips
-FROM taxi_trips;
-
--- Average Fare
-SELECT AVG(fare_amount) AS average_fare
-FROM taxi_trips;
-
--- Average Trip Distance
-SELECT AVG(trip_distance) AS average_trip_distance
-FROM taxi_trips;
-
--- Total Trip Amount
-SELECT SUM(total_amount) AS total_trip_amount
-FROM taxi_trips;
-
--- Daily Trips
-SELECT
-    DATE(tpep_pickup_datetime) AS pickup_day,
-    COUNT(*) AS trip_count
-FROM taxi_trips
-GROUP BY DATE(tpep_pickup_datetime)
-ORDER BY pickup_day;
-
--- Daily Trip Amount
-SELECT
-    DATE(tpep_pickup_datetime) AS pickup_day,
-    SUM(total_amount) AS daily_amount
-FROM taxi_trips
-GROUP BY DATE(tpep_pickup_datetime)
-ORDER BY pickup_day;
-
--- Top 10 Pickup Zones
-SELECT
-    PULocationID,
-    COUNT(*) AS trip_count
-FROM taxi_trips
-GROUP BY PULocationID
-ORDER BY trip_count DESC
-LIMIT 10;
-```
-
-------------------------------------------------------------------------
-
-## 9. Metabase Components
-
-Metabase is the BI and visualization layer. It connects to PostgreSQL
-and queries the processed `taxi_trips` table.
-
-### Database connection
-
-Use these settings when configuring the database connection from the
-Metabase container:
-
-``` text
-Database: nyc_taxi
-Host:     host.docker.internal
-Port:     5432
-User:     nyc_user
-Table:    taxi_trips
-SSL:      Off for this local setup
-```
-
-Use the password configured for PostgreSQL in your local
-`docker-compose.yml`.
-
-### Questions
-
-In Metabase, each individual KPI or chart is created as a **Question**.
-The dashboard uses questions such as:
-
--   Count of rows
--   Average `fare_amount`
--   Average `trip_distance`
--   Sum of `total_amount`
--   Count of trips by pickup date
--   Sum of `total_amount` by pickup date
--   Count by `payment_type`
--   Count by `PULocationID`
-
-### Payment type labels
-
-A Metabase custom expression maps payment type IDs to readable labels:
-
-``` text
-0 → Flex Fare
-1 → Credit Card
-2 → Cash
-3 → No Charge
-4 → Dispute
-5 → Unknown
-6 → Voided Trip
-```
-
-This makes the payment chart easier to interpret than displaying numeric
-codes alone.
-
-### Dashboard
-
-The individual Metabase Questions are combined into a dashboard named:
-
-``` text
-NYC Taxi Dashboard
-```
-
-This provides a single analytical view of the processed dataset.
-
-### Metabase persistence
-
-The Compose-managed volume is:
-
-``` text
-nyc-taxi-data-pipeline_metabase_data
-```
-
-This volume stores Metabase application state, including dashboard
-configuration, across container restarts. A newly cloned project on
-another machine creates a new volume; it does not automatically copy
-dashboards from the original machine.
-
-------------------------------------------------------------------------
-
-## 10. MinIO Image and Volume-Permission Update
-
-**Update (October 2026):** The `minio/minio` image used in the original
-local setup could no longer be pulled in the new laptop environment.
-Docker returned a pull-access error, so the Compose configuration was
-changed to use the Chainguard MinIO image:
-
-``` yaml
-image: cgr.dev/chainguard/minio:latest
-```
-
-The new image started with a different non-root user/permission setup.
-MinIO repeatedly restarted with errors similar to:
-
-``` text
-FATAL Unable to initialize backend: Unable to write to the backend
-Error: unable to rename /data/.minio.sys/tmp ... file access denied
-```
-
-The issue was not caused by the Airflow DAG. The MinIO process could not
-write to its mounted Docker volume because the volume's ownership did
-not match the container user's UID/GID.
-
-### Fix applied
-
-The Compose-managed MinIO volume was:
-
-``` text
-nyc-taxi-data-pipeline_minio_data
-```
-
-MinIO was stopped, and a temporary Alpine container was run as root to
-change ownership on the existing volume:
-
-``` bash
-docker compose stop minio
-
-docker run --rm --user 0:0 \
-  -v nyc-taxi-data-pipeline_minio_data:/data \
-  alpine:3.20 \
-  sh -c 'chown -R 65532:65532 /data && chmod -R u+rwX /data'
-
-docker compose up -d minio
-```
-
-**What the command does:**
-
--   `--rm` removes the temporary helper container when it exits.
--   `--user 0:0` runs the helper as root so it can change file
-    ownership.
--   `-v ...:/data` mounts the existing named volume; it does not create
-    a new empty data directory.
--   `chown -R 65532:65532 /data` changes ownership recursively to
-    UID/GID `65532`, used by the configured Chainguard image.
--   `chmod -R u+rwX /data` grants the owner read/write access and
-    directory traversal permissions.
-
-After the change, MinIO started successfully.
-
-### Verify MinIO
-
-``` bash
-docker compose ps
-docker compose logs minio --tail=30
-curl -i http://localhost:9000/minio/health/live
-```
-
-A healthy MinIO instance should return **HTTP 200** from the liveness
-endpoint.
-
-### Important notes
-
--   The permission fix is a one-time setup/troubleshooting step for a
-    volume with incompatible ownership. It does not need to run for
-    every Airflow DAG execution.
-
--   If the Compose project name or volume name changes, retrieve the
-    actual volume name with:
-
-    ``` bash
-    docker inspect minio --format '{{json .Mounts}}'
-    ```
-
--   Do not run `docker compose down -v` as part of this fix. Removing
-    the volume would delete the stored MinIO data.
-
--   The UID/GID and image details above match the working fix in this
-    setup. If the MinIO image is changed or upgraded, verify the user ID
-    and volume permissions again.
-
--   For reproducible deployments, pin a tested image version or digest
-    instead of relying indefinitely on `latest`.
-
--   The local credentials in this project are for development only. Use
-    secure secrets and credentials for shared or production
-    environments.
-
-------------------------------------------------------------------------
-
-## 11. Docker Services and Persistence
-
-The project uses Docker Compose for the supporting services:
-
-  ----------------------------------------------------------------------------------------------------
-  Service          Container                    Host port Persistent volume
-  ---------------- ---------------- --------------------- --------------------------------------------
-  PostgreSQL       `nyc-postgres`                  `5432` `nyc-taxi-data-pipeline_nyc_postgres_data`
-
-  MinIO            `minio`                 `9000`, `9001` `nyc-taxi-data-pipeline_minio_data`
-
-  Metabase         `metabase`                      `3000` `nyc-taxi-data-pipeline_metabase_data`
-  ----------------------------------------------------------------------------------------------------
-
-Named volumes keep service data outside the lifecycle of individual
-containers. Removing and recreating a container normally preserves its
-named volume; deleting the volume does not.
-
-A clone on a different laptop includes the code in Git, but it does not
-include the original laptop's Docker volumes. The new machine therefore
-starts with its own PostgreSQL database, MinIO storage, and Metabase
-application state unless those are migrated separately.
-
-### Useful commands
-
-``` bash
-# Start services
-docker compose up -d
-
-# List running containers
-docker ps
-
-# View service logs
-docker compose logs --tail=50 minio
-docker compose logs --tail=50 nyc-postgres
-docker compose logs --tail=50 metabase
-
-# Restart a service
-docker compose restart minio
-
-# Stop containers without deleting named volumes
-docker compose stop
-
-# Inspect the MinIO volume mount
-docker inspect minio --format '{{json .Mounts}}'
-```
-
-------------------------------------------------------------------------
-
-## 12. Future Improvements
-
--   Join the official TLC Taxi Zone lookup so the dashboard displays
-    zone names instead of only IDs.
--   Parameterize the month and source file to support additional monthly
-    batches.
--   Add incremental loading or upsert logic instead of truncating the
-    full table.
--   Add stronger schema checks and configurable data-quality thresholds.
--   Pin container images and dependency versions for repeatable
-    deployments.
--   Add automated tests and pipeline monitoring.
-
-------------------------------------------------------------------------
-
-## 13. Overall
-
-This project demonstrates a complete local batch data engineering
-pipeline:
-
-**Ingestion → Object storage → Transformation → Data quality → Database
-loading → BI visualization**
-
-It combines Airflow orchestration, PySpark processing, MinIO object
-storage, PostgreSQL analytics storage, Docker-based local
-infrastructure, and Metabase dashboards into a single practical data
-engineering project.
+This project is for educational and portfolio purposes. Dataset sourced from the [NYC Taxi & Limousine Commission (TLC)](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page).

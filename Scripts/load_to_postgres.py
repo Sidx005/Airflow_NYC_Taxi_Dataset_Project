@@ -1,19 +1,24 @@
+import os
 from pyspark.sql import SparkSession
 
-INPUT_PATH="/usr/local/airflow/processed_yellow_tripdata_2026-01"
-POSTGRES_URL="jdbc:postgresql://nyc-postgres:5432/nyc_taxi"
+INPUT_PATH    = os.environ.get("PROCESSED_OUTPUT_PATH", "/usr/local/airflow/processed_yellow_tripdata_2026-01")
+PG_HOST       = os.environ.get("POSTGRES_HOST", "nyc-postgres")
+PG_PORT       = os.environ.get("POSTGRES_PORT", "5432")
+PG_DB         = os.environ.get("POSTGRES_DB", "nyc_taxi")
+POSTGRES_URL  = f"jdbc:postgresql://{PG_HOST}:{PG_PORT}/{PG_DB}"
+JDBC_JAR      = os.environ.get("POSTGRES_JDBC_JAR", "/usr/local/airflow/jars/postgresql-42.7.8.jar")
 
 
-POSTGRES_PROPERTIES={
-    "user" : "nyc_user",
-    "password":"nyc_password",
-    "driver":"org.postgresql.Driver"
+POSTGRES_PROPERTIES = {
+    "user":     os.environ.get("POSTGRES_USER", "nyc_user"),
+    "password": os.environ.get("POSTGRES_PASSWORD", "nyc_password"),
+    "driver":   "org.postgresql.Driver",
 }
 
-spark=(
+spark = (
     SparkSession.builder
     .appName("NYCTaxiPostgresLoad")
-    .config("spark.jars", "/usr/local/airflow/jars/postgresql-42.7.8.jar")
+    .config("spark.jars", JDBC_JAR)
     .getOrCreate()
 )
 
